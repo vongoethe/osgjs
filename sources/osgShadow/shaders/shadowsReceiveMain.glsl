@@ -15,14 +15,15 @@ if (depthRange.x == depthRange.y) {
 }
 
 vec4 shadowVertexEye;
+vec4 shadowNormalEye;
 float shadowReceiverZ = 0.0;
 vec4 shadowVertexProjected;
 vec2 shadowUV;
 
 if(!earlyOut) {
 
-    shadowVertexEye=  shadowViewMatrix *  vec4(vertexWorld, 1.0);
-    shadowReceiverZ=  - shadowVertexEye.z;
+    
+    shadowVertexEye =  shadowViewMatrix *  vec4(vertexWorld, 1.0);
     shadowVertexProjected = shadowProjectionMatrix * shadowVertexEye;
 
     if (shadowVertexProjected.w < 0.0) {
@@ -37,6 +38,14 @@ if(!earlyOut) {
             earlyOut = true;// limits of light frustum
         }
           
+        shadowNormalEye =  shadowViewMatrix *  vec4(normalWorld, 0.0);
+
+        if(!gl_FrontFacing) {
+            shadowNormalEye = -shadowNormalEye;
+        }
+        // http://www.dissidentlogic.com/old/images/NormalOffsetShadows/GDC_Poster_NormalOffset.png        
+        shadowReceiverZ =  - shadowVertexEye.z  - (shadowNormalEye.z / (bias * (depthRange.y - depthRange.x)));
+        
         // most precision near 0, make sure we are near 0 and in [0,1]
         shadowReceiverZ =  (shadowReceiverZ - depthRange.x)* depthRange.w;
 
@@ -70,8 +79,10 @@ if (earlyOut) return shadow;
 
 // depth bias: fighting shadow acne (depth imprecsion z-fighting)
 float shadowBias = 0.0;
+float N_Dot_L = dot(lightEyeDir, shadowNormalEye.xyz);
+
 // cosTheta is dot( n, l ), clamped between 0 and 1
-//float shadowBias = 0.005*tan(acos(N_Dot_L));
+// shadowBias = 0.005*tan(acos(N_Dot_L));
 // same but 4 cycles instead of 15
 shadowBias += 0.05 *  sqrt( 1. -  N_Dot_L*N_Dot_L) / clamp(N_Dot_L, 0.0005,  1.0);
 
@@ -87,7 +98,7 @@ shadowBias = clamp(shadowBias, 0.00005,  bias);
 // because they ALL becomes behind any point in Caster depth map
 shadowReceiverZ = clamp(shadowReceiverZ, 0., 1. - shadowBias);
 
-shadowReceiverZ -= shadowBias;
+//shadowReceiverZ -= shadowBias;
 
 // Now computes Shadow
 
